@@ -7,8 +7,8 @@
 #include <regex>
 #include <unistd.h> // close()
 #include <openssl/ssl.h>
-#include <arpa/inet.h>
 #include <dirent.h> //DIR
+
 
 using namespace std;
 
@@ -40,9 +40,9 @@ void connectToServer(); // Vytvoreni socketu a navazani spojeni se serverem.
 void communication(); // Komunikace se serverem.
 string receive_message(); // Prijem jednoradkovych zprav.
 string receive_retr_message(); // Prijem viceradkovych zprav.
-void send_message(stringstream &message); // Odesilani pozadavku na server.
-long string_stream_size(stringstream &s);
+void sendMessage(string message); // Odesilani pozadavku na server.
 void secure();
+int findInFolder(string *ID);
 
 int main(int argc, char *argv[]) {
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
                     exit(1);
                 }
 
-            case 'd': // TODO  Mazani zprav. Muze byt pouzit s parametrem -n?
+            case 'd': //
                 if(!f.dFlag) {
                     f.dFlag = 1;
                     break;
@@ -231,6 +231,9 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
+//-----------------------------------------------------------------
+//-------------------------POMOCNE FUNKCE--------------------------
 
 void procAuth(string *authAddr){
     ifstream myFile;
@@ -356,7 +359,6 @@ void connectToServer() {
 string receive_message(){
     string mystream;
     long read_block = 0;
-    long total_size = 0;
     char s_rBuff[512];
     //bff
 
@@ -405,58 +407,34 @@ string receive_retr_message(){
 }
 
 
-void send_message(stringstream &message){
-
-    long size = string_stream_size(message);
-    long read_block = 1024;
-    long total_size = 0;
-    char* s_rBuff = 0;
-    s_rBuff = new char[ 1024 ]; //buffer
-    message.seekg(0, ios::beg);
-
-    while(true){
-        long remining_size = size - message.tellg(); // zbyvajici velikost
-        if (read_block >= remining_size)
-            read_block = remining_size;
-
-        if (total_size >= size)
-            break;
-        message.read( s_rBuff, read_block );
-        if(!f.tFlag) {
-            send(f.mySocket, s_rBuff, (size_t) read_block, 0);
-        }else{
-            SSL_write(f.myssl, s_rBuff, (size_t)read_block);
-        }
-        total_size += read_block;
+void sendMessage(string message){
+    // Odesilani pozadavku na server.
+    if(!f.tFlag){
+        //TODO dodelat nesifrovanou
+    }else{
+        SSL_write(f.myssl,message.c_str(),(int)message.length());
     }
-
-    delete(s_rBuff);
 }
 
-
-long string_stream_size(stringstream &s){
-    long size = 0;
-    long act_pos = s.tellg();
-
-    s.seekg(0, ios::end);
-    size = s.tellg() ;
-    s.seekg(act_pos, ios::beg);
-    return size;
-}
 
 void communication(){
+
     stringstream mystream;
     mystream.str("");
     mystream << receive_message();
     cout << mystream.str();
+    if(mystream.str().substr(0, 4) == "-ERR"){
+        cerr << "Username Error.\n";
+        exit(1);
+    }
 
-    stringstream http_request;
+    string request;
 
     if(f.sFlag){
+
         // SEND - STLS
-        http_request.str("");
-        http_request << "STLS" << "\r\n";
-        send_message(http_request);
+        request = "STLS\r\n";
+        sendMessage(request);
 
         mystream.str("");
         mystream << receive_message();
@@ -471,57 +449,66 @@ void communication(){
     }
 
     // SEND - USER XXXXXX
-    http_request.str("");
-    http_request << "USER " << f.authUser <<"\r\n";
-    send_message(http_request);
+    request = "USER ";
+    request.append(f.authUser);
+    request.append("\r\n");
+    sendMessage(request);
 
     mystream.str("");
     mystream << receive_message();
     cout << mystream.str();
+    if(mystream.str().substr(0, 4) == "-ERR"){
+        cerr << "Username Error.\n";
+        exit(1);
+    }
+
 
     //SEND - PASS XXXXX
-    http_request.clear();
-    http_request <<"PASS " << f.authPass <<"\r\n";
-    send_message(http_request);
+    request = "PASS ";
+    request.append(f.authPass);
+    request.append("\r\n");
+    sendMessage(request);
 
     mystream.str("");
     mystream << receive_message();
     cout << mystream.str();
+    if(mystream.str().substr(0, 4) == "-ERR"){
+        cerr << "Password Error.\n";
+        exit(1);
+    }
 
-    //SEND - LIST
-    http_request.str("");
-    http_request <<"STAT\r\n";
-    send_message(http_request);
-
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-
-
-    //SEND - LIST
-    http_request.str("");
-    http_request <<"STAT\r\n";
-    send_message(http_request);
+    //SEND - STAT
+    request = "STAT\r\n";
+    sendMessage(request);
 
     mystream.str("");
     mystream << receive_message();
     cout << mystream.str();
+    if(mystream.str().substr(0, 4) == "-ERR"){
+        cerr << "Error.\n";
+        exit(1);
+    }
 
-    // TODO v gmailu pada
+
     int list = stoi(mystream.str().substr(4,1)); //pocet emailu
+    int downloadCount = 0;
 
     if(!f.dFlag) { // Stahovani emailu
         for (int i = 1; i <= list; i++) {
 
-            //SEND - RETR XXXXX
-            http_request.str("");
-            http_request << "RETR " << i << "\r\n";
-            send_message(http_request);
+            //SEND - RETR X
+            request = "RETR ";
+            request += to_string(i);
+            request.append("\r\n");
+            sendMessage(request);
 
             mystream.str("");
             mystream << receive_retr_message();
+            if (mystream.str().substr(0, 4) == "-ERR") {
+                cerr << "Downloading emails failed.\n";
+                exit(1);
+            }
 
-            //std::cout << mystream.str();
             string message = mystream.str();
             unsigned long messageIND = message.find("\r\n"); //zacatek zpravy
             unsigned long messageIND2 = message.find("\r\n.\r\n"); //konec zpravy
@@ -540,19 +527,33 @@ void communication(){
                 messageID = matchResult.str().substr(13, matchResult.str().length() - 14);
             }
 
-            ofstream os(f.outDir + messageID + ".txt"); //TODO opravit kdyz chyby lomitko, nebo to popsat v man
-            if (!os) { cerr << "Error writing to ..." << endl; } //TODO opravit kdyz neni slozka tak ji vytvor.
-            else {
-                os << message;
+            if (f.nFlag) {
+                if (findInFolder(&messageID)) {
+                    ofstream os(f.outDir + messageID); //TODO opravit kdyz chyby lomitko, nebo to popsat v man
+                    if (!os) { cerr << "Error writing to ..." << endl; } //TODO opravit kdyz neni slozka tak ji vytvor.
+                    else {
+                        os << message;
+                        downloadCount++;
+                    }
+                } else {
+                    continue;
+                }
+            }else{
+                ofstream os(f.outDir + messageID); //TODO opravit kdyz chyby lomitko, nebo to popsat v man
+                if (!os) { cerr << "Error writing to ..." << endl; } //TODO opravit kdyz neni slozka tak ji vytvor.
+                else {
+                    os << message;
+                    downloadCount++;
+                }
             }
         }
         // Vypis zprav.
-        if(list == 1){
-            cout << "Stazena " << to_string(list) << " zprava.";
-        }else if((list == 2) or (list == 3) or (list == 4)){
-            cout << "Stazeny " << to_string(list) << " zpravy.";
+        if(downloadCount == 1){
+            cout << "Stazena " << to_string(downloadCount) << " zprava.\r\n";
+        }else if((downloadCount == 2) or (downloadCount == 3) or (downloadCount == 4)){
+            cout << "Stazeny " << to_string(downloadCount) << " zpravy.\r\n";
         }else{
-            cout << "Stazeno " << to_string(list) << " zprav.";
+            cout << "Stazeno " << to_string(downloadCount) << " zprav.\r\n";
         }
 
 
@@ -560,43 +561,36 @@ void communication(){
         for(int i = 1; i <= list; i++){
 
             //SEND - DELE XXXXX
-            http_request.str("");
-            http_request << "DELE " << i << "\r\n";
-            send_message(http_request);
+            request = "DELE ";
+            request += to_string(i);
+            request.append("\r\n");
+            sendMessage(request);
 
             mystream.str("");
             mystream << receive_message();
             cout << mystream.str();
 
-            //SEND - LIST
-            http_request.str("");
-            http_request <<"LIST\r\n";
-            send_message(http_request);
 
-            mystream.str("");
-            mystream << receive_message();
-            std::cout << mystream.str();
-
-            //SEND - LIST
-            http_request.str("");
-            http_request <<"QUIT\r\n";
-            send_message(http_request);
-
-            mystream.str("");
-            mystream << receive_message();
-            cout << mystream.str();
         }
-        // Mazani zprav.
+        // Mazani zprav. //TODO downloadCount
         if(list == 1){
-            cout << "Smazana " << to_string(list) << " zprava.";
+            cout << "Smazana " << to_string(list) << " zprava.\r\n";
         }else if((list == 2) or (list == 3) or (list == 4)){
-            cout << "Smazany " << to_string(list) << " zpravy.";
+            cout << "Smazany " << to_string(list) << " zpravy.\r\n";
         }else{
-            cout << "Smazano " << to_string(list) << " zprav.";
+            cout << "Smazano " << to_string(list) << " zprav.\r\n";
         }
 
     }
 
+    //SEND - QUIT
+    request = "QUIT ";
+    request.append("\r\n");
+    sendMessage(request);
+
+    mystream.str("");
+    mystream << receive_message();
+    cout << mystream.str();
     //Ukončení spojení
     close(f.mySocket);
 }
@@ -611,61 +605,59 @@ void secure() {
 
     meth = SSLv23_client_method();
 
-    /*Create a new context block*/
+    //Create a new context block
     ctx = SSL_CTX_new(meth);
     if (!ctx) {
-        printf("Error creating the context.\n");
+        cerr << "Error creating the context.\n";
         exit(1);
     }
 
     f.myssl = SSL_new(ctx);
 
-    // Pouziti certifikatu. Parametry '-c' a '-C'.
-    //TODO load -c and -C certificates
-    if (f.cFlag) {
-        if (!SSL_CTX_use_certificate_file(ctx, f.certFile.c_str(), SSL_FILETYPE_PEM)) {
-            printf("Certificate failed.\n");
-            exit(1);
-        }
-    }
-    //https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 
-    //TODO udelej z toho fci, kterou budes volat i u spatnyho -c
-    if (f.bigcFlag){
-        DIR *dir;
-        struct dirent *ent;
-        string certAddrTmp = f.certAddr; // TODO zkusit poslat rovnou do opendir
-        if ((dir = opendir (certAddrTmp.c_str())) != nullptr) {
-            /* print all the files and directories within directory */
-            while ((ent = readdir (dir)) != nullptr) {
-                cout << ent->d_name << "\n";
-                string certTmp = certAddrTmp;
-                certTmp.append(ent->d_name);
-                if (SSL_CTX_use_certificate_file(ctx, certTmp.c_str(), SSL_FILETYPE_PEM)) { //TODO osetrit lomeno mezi cestou a nazvem souboru.
-                    break;
+ //----------------------------------------------
+// Pouziti certifikatu. Parametry '-c' a '-C'.
+
+    if (f.cFlag) { // Certifikacni soubour.
+          if(!SSL_CTX_load_verify_locations(ctx,f.certFile.c_str(), nullptr)){
+            if(f.bigcFlag){ // Pokud je pouzit -C, tak prohleda i slozku s certifikaty.
+                if(! SSL_CTX_load_verify_locations(ctx, nullptr, f.certAddr.c_str()))
+                {
+                    cerr << "Certificate Failed.\n";
+                    exit(1);
                 }
+            }else {
+                cerr << "Certificate Failed.\n";
+                exit(1);
             }
-            closedir (dir);
-        } else {
-            printf("Could not open directory.\n"); //TODO otestovat
-            exit(1);
         }
     }
 
+    if (f.bigcFlag and !f.cFlag){ // Pokud se prohledava pouze slozka s certifikaty.
+        if(! SSL_CTX_load_verify_locations(ctx, nullptr, f.certAddr.c_str())) // "/etc/ssl/certs"
+        {
+            cerr << "Certificate Failed.\n";
+            exit(1);
+        }
 
-    SSL_CTX_set_default_verify_paths(ctx); //TODO handle err
+    }
+
+    if(!f.cFlag and !f.bigcFlag) { // Bez prepinace '-c'/'-C'.
+        SSL_CTX_set_default_verify_paths(ctx); //TODO handle err
+    }
+//-------------------------------------------------
 
     SSL_set_fd(f.myssl, f.mySocket);
 
     if (!(SSL_connect(f.myssl))) {
-        printf("SSL connection failed.\n");
+        cerr << "SSL connection failed.\n";
         exit(1);
     }
 
     X509 * server_cert = nullptr;
     server_cert = SSL_get_peer_certificate(f.myssl);
     if (server_cert == nullptr) {
-        printf("Attribution of the certificate failed.\n");
+        cerr << "Attribution of the certificate failed.\n";
         exit(1);
     } else {
         X509_free(server_cert);
@@ -673,7 +665,29 @@ void secure() {
 
     if (SSL_get_verify_result(f.myssl) != X509_V_OK)
     {
-        printf("SSL failed.\n");
+        cerr << "SSL Failed.\n";
+        exit(1);
+    }
+}
+
+int findInFolder(string *ID){
+    //https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+    DIR *dir;
+    struct dirent *ent;
+    string outputFolder = f.outDir; // TODO zkusit poslat rovnou do opendir
+    if ((dir = opendir (outputFolder.c_str())) != nullptr) {
+        // print all the files and directories within directory
+        while ((ent = readdir (dir)) != nullptr) {
+            string myID = ent->d_name;
+            if (*ID == myID ){
+                closedir (dir);
+                return 0; //Shoda
+            }
+        }
+        closedir (dir);
+        return 1;
+    } else {
+        printf("Could not open directory.\n"); //TODO otestovat
         exit(1);
     }
 }
