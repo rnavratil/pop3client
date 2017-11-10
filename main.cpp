@@ -38,12 +38,13 @@ int dns(string hostname , string & ip); // Preklad domenoveho jmena na ip adresu
 void kindOfServerAddr(string address); // Zjisteni typu ip adresy.
 void connectToServer(); // Vytvorereni socketu a navazani spojeni se serverem.
 void communication(); // Komunikace se serverem.
+void processingMessage(int list); // Stahovani a Mazani zprav.
 string receive_message(); // Prijem jednoradkovych zprav.
 string receive_retr_message(); // Prijem viceradkovych zprav.
 string getMessageId(string message, int i); //Vraci Message-ID emailu.
 void sendMessage(string message); // Odesilani pozadavku na server.
-void secure();
-int findInFolder(string *ID);
+void secure(); // Zajisteni sifrovane komunikace.
+int findInFolder(string *ID); // Hledani zprav ve slozce.
 
 
 int main(int argc, char *argv[]) {
@@ -57,9 +58,7 @@ int main(int argc, char *argv[]) {
     string authAddr; // Cesta k autentizacnimu souboru.
 
 
-//-----------------------------------------------------------------
-//------------------------ARGUMENTY--------------------------------
-// Zpracovani
+// Zpracovani Argumentu
     int c;
     while ((c = getopt(argc, argv, "p:TSc:C:dna:o:h")) != -1) {
         switch (c) {
@@ -183,49 +182,49 @@ int main(int argc, char *argv[]) {
     }
 
 // Napoveda.
- if(hFlag and (argc > 2)){
-    cerr << "Invalid argument. -h can not be used with other parameters.\n";
-    exit(1);
- }else if(hFlag){
-     cout << "\nABOUT:\n\n";
-     cout << "POP3 POP3 Reader with pop3s extensions.\n\n\n";
-     cout << "USE:\n\n";
-     cout << "popcl <server> [-p <port>] [-T|-S [-c <certfile>] [-C <certaddr>]] [-d] [-n] -a <auth_file> ";
-     cout << "-o <out_dir>\n\n\n";
-     cout << "Parameters:\n\n";
-     cout << "<server>  -  Mandatory  - Required is the <server> name (IP address or domain name) of the";
-     cout << "requested resource.\n\n";
-     cout << "[-p <port>]  -  Optional  - Specifies the port number <port> on the server.\n\n";
-     cout << "-T  -  Optional  - Establishes encryption of the entire communication.\n\n";
-     cout << "-S  -  Optional  -  Establishes an unencrypted connection to the server and switches to an encrypted";
-     cout << " protocol variant.\n\n";
-     cout << "[-c <certfile>]  -  Optional  -  Defines the <certfile> certificate file to be used to validate the";
-     cout << " SSL / TLS certificate validity submitted by the server (use only with -T or -S).\n\n";
-     cout << "[-C <certaddr>]  -  Optional  -  Specifies the <certaddr> directory in which to search for the";
-     cout << " certificates to be used to validate the SSL / TLS certificate validity submitted by the server";
-     cout << " (use only with -T or -S).\n\n";
-     cout << "[-d]  -  Optional  - Deleting messages on the server.\n\n";
-     cout << "[-n]  -  Optional  - Work only with new messages.\n\n";
-     cout << "-a <auth_file>  -  Mandatory  -  Authentication file.\n\nusername = XXX\npassword = YYY\n\n";
-     cout << "-o <out_dir>  -  Mandatory  - Output directory <out_dir> to which the downloaded message program has to";
-     cout << "be saved.\n\n";
-     exit(0);
- }
+    if(hFlag and (argc > 2)){
+        cerr << "Invalid argument. -h can not be used with other parameters.\n";
+        exit(1);
+    }else if(hFlag){
+        cout << "\nABOUT:\n\n";
+        cout << "POP3 POP3 Reader with pop3s extensions.\n\n\n";
+        cout << "USE:\n\n";
+        cout << "popcl <server> [-p <port>] [-T|-S [-c <certfile>] [-C <certaddr>]] [-d] [-n] -a <auth_file> ";
+        cout << "-o <out_dir>\n\n\n";
+        cout << "Parameters:\n\n";
+        cout << "<server>  -  Mandatory  - Required is the <server> name (IP address or domain name) of the";
+        cout << "requested resource.\n\n";
+        cout << "[-p <port>]  -  Optional  - Specifies the port number <port> on the server.\n\n";
+        cout << "-T  -  Optional  - Establishes encryption of the entire communication.\n\n";
+        cout << "-S  -  Optional  -  Establishes an unencrypted connection to the server and switches to an encrypted";
+        cout << " protocol variant.\n\n";
+        cout << "[-c <certfile>]  -  Optional  -  Defines the <certfile> certificate file to be used to validate the";
+        cout << " SSL / TLS certificate validity submitted by the server (use only with -T or -S).\n\n";
+        cout << "[-C <certaddr>]  -  Optional  -  Specifies the <certaddr> directory in which to search for the";
+        cout << " certificates to be used to validate the SSL / TLS certificate validity submitted by the server";
+        cout << " (use only with -T or -S).\n\n";
+        cout << "[-d]  -  Optional  - Deleting messages on the server.\n\n";
+        cout << "[-n]  -  Optional  - Work only with new messages.\n\n";
+        cout << "-a <auth_file>  -  Mandatory  -  Authentication file.\n\nusername = XXX\npassword = YYY\n\n";
+        cout << "-o <out_dir>  -  Mandatory  - Output directory <out_dir> to which the downloaded message program has to";
+        cout << "be saved.\n\n";
+        exit(0);
+    }
 
 // Osetreni pouzitych argumentu.
- if ((f.bigcFlag or f.cFlag) and !(f.sFlag or f.tFlag)) {
-     cerr << "Invalid argument. -C or -c can be used only with -S or -T.\n";
-     exit(1);
- }else if(!aFlag){
-     cerr << "Invalid argument. -a is not used.\n";
-     exit(1);
- }else if(!oFlag){
-     cerr << "Invalid argument. -o is not used.\n";
-     exit(1);
- }else if(!addrFlag){
-     cerr << "Invalid argument. Server name is missing.\n";
-     exit(1);
- }
+    if ((f.bigcFlag or f.cFlag) and !(f.sFlag or f.tFlag)) {
+        cerr << "Invalid argument. -C or -c can be used only with -S or -T.\n";
+        exit(1);
+    }else if(!aFlag){
+        cerr << "Invalid argument. -a is not used.\n";
+        exit(1);
+    }else if(!oFlag){
+        cerr << "Invalid argument. -o is not used.\n";
+        exit(1);
+    }else if(!addrFlag){
+        cerr << "Invalid argument. Server name is missing.\n";
+        exit(1);
+    }
 
 // Osetreni portu zadaneho uzivatelem.
     if(f.portNumber != 110 and f.portNumber != 995 ){
@@ -250,8 +249,6 @@ int main(int argc, char *argv[]) {
         f.portNumber = 995;
     }
 
-//-----------------------------------------------------------------
-//-----------------------------KOMUNIKACE--------------------------
 
 // Vytvoreni socketu, inicializace a pripojeni na server.
     connectToServer();
@@ -267,9 +264,10 @@ int main(int argc, char *argv[]) {
 }
 
 //-----------------------------------------------------------------
-//-------------------------POMOCNE FUNKCE--------------------------
+//---------------Zpracovani autentizacniho souboru-----------------
 
 void procAuth(string *authAddr){
+
     ifstream myFile;
     myFile.open (*authAddr); // Otevreni souboru pro cteni.
     string line;
@@ -300,6 +298,9 @@ void procAuth(string *authAddr){
     }
 }
 
+//-----------------------------------------------------------------
+//------------------Rozpoznani domenoveho jmena--------------------
+
 int dns(string hostname , string & ip)
 {
     struct hostent *name;
@@ -316,6 +317,9 @@ int dns(string hostname , string & ip)
     }
     return 1;
 }
+
+//-----------------------------------------------------------------
+//----------------------Zjisteni typu IP --------------------------
 
 void kindOfServerAddr(string address){
     // ipv4 identifikator.
@@ -349,7 +353,9 @@ void kindOfServerAddr(string address){
     }
 }
 
-// Zajistuje pripojeni clienta se serverem.
+//-----------------------------------------------------------------
+//----------------Propojeni klienta ze servrem---------------------
+
 void connectToServer() {
     stringstream mystream;
 
@@ -391,7 +397,9 @@ void connectToServer() {
     }
 }
 
-// Prijimani jednoradkovych zprav ze serveru.
+//-----------------------------------------------------------------
+//----------------Prijmani jednoradkovych zprav--------------------
+
 string receive_message(){
     string mystream;
     long read_block = 0;
@@ -416,7 +424,9 @@ string receive_message(){
     return mystream;
 }
 
-// Prijimani multi-line zprav ze serveru.
+//-----------------------------------------------------------------
+//-------------------Prijmani multi-line zprav---------------------
+
 string receive_retr_message(){
 
     long rc = 0;
@@ -442,7 +452,9 @@ string receive_retr_message(){
 
 }
 
-// Odesilani pozadavku na server.
+//-----------------------------------------------------------------
+//----------------Odesilani pozadavku na server--------------------
+
 void sendMessage(string message){
     if(!f.tFlag){
         send(f.mySocket, message.c_str(), (int)message.length(), 0);
@@ -451,29 +463,30 @@ void sendMessage(string message){
     }
 }
 
-// Zajistije hlavni komunikaci se serverem.
+//-----------------------------------------------------------------
+//-----------------Komunikace ze serverem--------------------------
+
 void communication(){
 
-    stringstream mystream;
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-    if(mystream.str().substr(0, 4) == "-ERR"){
+    string message; // Prijata zprava ze serveru.
+    string request; // Pozadavek odeslany serveru.
+
+    message = receive_message(); // Overeni spojeni.
+    cout << message;
+    if(message.substr(0, 4) == "-ERR"){
         cerr << "Username Error.\n";
         exit(1);
     }
 
-    string request;
-
+    // TLS
     if(f.sFlag){
 
         // SEND - STLS
         request = "STLS\r\n";
         sendMessage(request);
 
-        mystream.str("");
-        mystream << receive_message();
-        string tmpSTLS = mystream.str().substr(0,3);
+        message = receive_message();
+        string tmpSTLS = message.substr(0,3);
         if(tmpSTLS == "+OK"){
             f.tFlag = 1;
             secure();
@@ -489,14 +502,12 @@ void communication(){
     request.append("\r\n");
     sendMessage(request);
 
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-    if(mystream.str().substr(0, 4) == "-ERR"){
+    message = receive_message();
+    cout << message;
+    if(message.substr(0, 4) == "-ERR"){
         cerr << "Username Error.\n";
         exit(1);
     }
-
 
     //SEND - PASS XXXXX
     request = "PASS ";
@@ -504,10 +515,9 @@ void communication(){
     request.append("\r\n");
     sendMessage(request);
 
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-    if(mystream.str().substr(0, 4) == "-ERR"){
+    message = receive_message();
+    cout << message;
+    if(message.substr(0, 4) == "-ERR"){
         cerr << "Password Error.\n";
         exit(1);
     }
@@ -516,17 +526,50 @@ void communication(){
     request = "STAT\r\n";
     sendMessage(request);
 
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-    if(mystream.str().substr(0, 4) == "-ERR"){
+    message = receive_message();
+    cout << message;
+    if(message.substr(0, 4) == "-ERR"){
         cerr << "Error.\n";
         exit(1);
     }
 
+    // Pocet emailu na serveru
+    unsigned long LastSpace = message.find_last_of(" ");
+    int list;
+    try {
+        list = stoi(message.substr(4,LastSpace-4));
+    }
+    catch (const std::invalid_argument& ia) {
+        cerr << "Error. Out of range.\n";
+        exit(1);
+    }
 
-    int list = stoi(mystream.str().substr(4,1)); // Pocet emailu na serveru.
+
+    // Zpracovani zprav.
+    processingMessage(list);
+
+    // SEND - QUIT
+    request = "QUIT ";
+    request.append("\r\n");
+    sendMessage(request);
+
+    message = receive_message();
+    cout << message;
+
+    // Ukoncení spojeni.
+    close(f.mySocket);
+}
+
+
+//-----------------------------------------------------------------
+//-----------Zpracovani zprav ze serveru---------------------------
+
+void processingMessage(int list){
+
     int downloadCount = 0; // Urcuje pocet stahnutych/smazanych emailu.
+    string request; // Pozadavek odesleny na server.
+    string message; // Zprava prijata ze serveru.
+
 
     if(!f.dFlag) { // Stahovani emailu ze serveru.
         for (int i = 1; i <= list; i++) {
@@ -537,29 +580,26 @@ void communication(){
             request.append("\r\n");
             sendMessage(request);
 
-            mystream.str("");
-            string message = receive_retr_message(); //Prijata zprava
+            message = receive_retr_message(); //Prijata zprava
 
             if (message.substr(0, 4) == "-ERR") {
                 cerr << "Downloading emails failed.\n";
                 exit(1);
             }
-            //string message = mystream.str(); // Prevod prijate zpravy na string.
-
 
             // Odriznuti prebytecnych casti prijate zpravy.
             unsigned long messageIND = message.find("\r\n"); // Zacatek zpravy.
             messageIND = messageIND + 2;
-            unsigned long messageIND2 = message.find("\r\n.\r\n");
+            unsigned long messageIND2 = message.find("\r\n.\r\n"); // Konec zpravy.
             messageIND2 = messageIND2 + 2;
-            // Konec zpravy. //TODO osetrit kdyz to nedojde
+
             message = message.substr(messageIND, messageIND2 - messageIND);
 
             // Zjisteni Message-ID.
             string messageID = getMessageId(message, i);
 
 
-            if (f.nFlag) {
+            if (f.nFlag) { // Stahuji se pouze nove zpravy.
                 if (findInFolder(&messageID)) {
                     ofstream os(f.outDir + messageID);
                     if (!os) {
@@ -567,24 +607,27 @@ void communication(){
                         exit(1);
                     }
                     else {
+
                         os << message;
                         downloadCount++;
                     }
                 } else {
                     continue;
                 }
-            }else{
+            }else{ // Stahuji se vsechny zpravy.
                 ofstream os(f.outDir + messageID);
                 if (!os) {
                     cerr << "Error writing to output DIR.\n";
                     exit(1);
                 }
                 else {
+
                     os << message;
                     downloadCount++;
                 }
             }
         }
+
         // Vypis zprav.
         if(downloadCount == 1){
             cout << "Stazena " << to_string(downloadCount) << " zprava.\r\n";
@@ -598,21 +641,19 @@ void communication(){
     }else{ // Mazani emailu
         for(int i = 1; i <= list; i++){
 
-            if(f.nFlag){ // P
+            if(f.nFlag){ // Ze serveru se mazou prectene zpravy.
+
                 //SEND - RETR X
                 request = "RETR ";
                 request += to_string(i);
                 request.append("\r\n");
                 sendMessage(request);
 
-                mystream.str("");
-                mystream << receive_retr_message();
-                if (mystream.str().substr(0, 4) == "-ERR") {
+                message = receive_retr_message();
+                if (message.substr(0, 4) == "-ERR") {
                     cerr << "Downloading emails failed.\n";
                     exit(1);
                 }
-                string message = mystream.str(); // Prevod prijate zpravy na string.
-
 
                 // Zjisteni Message-ID.
                 string messageID = getMessageId(message, i);
@@ -625,11 +666,8 @@ void communication(){
                     request.append("\r\n");
                     sendMessage(request);
 
-                    mystream.str("");
-                    mystream << receive_message();
-                    cout << mystream.str();
-
-                    if (mystream.str().substr(0, 4) == "-ERR") {
+                    message = receive_message();
+                    if (message.substr(0, 4) == "-ERR") {
                         cerr << "Password Error.\n";
                         exit(1);
                     }
@@ -637,7 +675,7 @@ void communication(){
                     continue;
                 }
 
-            }else {
+            }else { // Ze serveru se mazou vsechny zpravy.
 
                 //SEND - DELE XXXXX
                 request = "DELE ";
@@ -645,19 +683,15 @@ void communication(){
                 request.append("\r\n");
                 sendMessage(request);
 
-                mystream.str("");
-                mystream << receive_message();
-                cout << mystream.str();
-
-                if (mystream.str().substr(0, 4) == "-ERR") {
+                message = receive_message();
+                if (message.substr(0, 4) == "-ERR") {
                     cerr << "Password Error.\n";
                     exit(1);
                 }
             }
-
             downloadCount++;
-
         }
+
         // Mazani zprav.
         if(downloadCount == 1){
             cout << "Smazana " << to_string(downloadCount) << " zprava.\r\n";
@@ -668,22 +702,13 @@ void communication(){
         }
 
     }
-
-    //SEND - QUIT
-    request = "QUIT ";
-    request.append("\r\n");
-    sendMessage(request);
-
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-
-    // Ukončení spojení
-    close(f.mySocket);
 }
 
-// Nastaveni SSL.
+//-----------------------------------------------------------------
+//--------------------------Nastaveni SSL--------------------------
+
 void secure() {
+
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
@@ -705,7 +730,7 @@ void secure() {
     // Pouziti certifikatu. Parametry '-c' a '-C'.
 
     if (f.cFlag) { // Certifikacni soubour.
-          if(!SSL_CTX_load_verify_locations(ctx,f.certFile.c_str(), nullptr)){
+        if(!SSL_CTX_load_verify_locations(ctx,f.certFile.c_str(), nullptr)){
             if(f.bigcFlag){ // Pokud je pouzit -C, tak prohleda i slozku s certifikaty.
                 if(! SSL_CTX_load_verify_locations(ctx, nullptr, f.certAddr.c_str()))
                 {
@@ -734,8 +759,9 @@ void secure() {
             exit(1);
         }
     }
-//-------------------------------------------------
 
+
+    //
     SSL_set_fd(f.myssl, f.mySocket);
 
     if (!(SSL_connect(f.myssl))) {
@@ -759,12 +785,15 @@ void secure() {
     }
 }
 
+//-----------------------------------------------------------------
+//--------------------Vyhledavani v adresari-----------------------
+
 int findInFolder(string *ID){
-    //https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+
     DIR *dir;
     struct dirent *ent;
     if ((dir = opendir (f.outDir.c_str())) != nullptr) {
-        // print all the files and directories within directory
+
         while ((ent = readdir (dir)) != nullptr) {
             string myID = ent->d_name;
             if (*ID == myID ){
@@ -780,25 +809,27 @@ int findInFolder(string *ID){
     }
 }
 
-// Identifikace message ID.
+//-----------------------------------------------------------------
+//---------------------Identifikace zpravy-------------------------
+
 string getMessageId(string message, int i){
 
-    stringstream mystream; // Zprava ze serveru.
+    string uidlMessage; // Zprava ze serveru.
     string ID; // Vysledny identifikator zpravy.
 
-// UIDL
+    // UIDL
     string request = "UIDL ";
     request += to_string(i);
     request.append("\r\n");
     sendMessage(request);
 
-    mystream.str("");
-    mystream << receive_message();
-    cout << mystream.str();
-    if (mystream.str().substr(0, 3) == "+OK") {
-        unsigned long tmpStart = mystream.str().find_last_of(" ");
-        unsigned long tmpEnd = mystream.str().find("\r\n");
-        ID =mystream.str().substr(tmpStart+1,(tmpEnd-tmpStart)-1);
+    //mystream.str("");
+    uidlMessage = receive_message();
+    cout << uidlMessage;
+    if (uidlMessage.substr(0, 3) == "+OK") {
+        unsigned long tmpStart = uidlMessage.find_last_of(" ");
+        unsigned long tmpEnd = uidlMessage.find("\r\n");
+        ID = uidlMessage.substr(tmpStart+1,(tmpEnd-tmpStart)-1);
         return ID;
     }
 
