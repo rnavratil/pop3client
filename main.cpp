@@ -6,7 +6,7 @@
 #include <arpa/inet.h> // inet_ntoa()
 #include <regex>
 #include <unistd.h> // close()
-#include <openssl/ssl.h>
+#include <openssl/ssl.h> // SSL
 #include <dirent.h> //DIR
 
 
@@ -23,7 +23,7 @@ struct allFlags {
     string authUser; // Username.
     string authPass; // Password
     string ip; // IP adresa.
-    string outDir; // Adresa vystupu
+    string outDir; // Adresa vystupu.
     string certFile; // Cesta k certifikatu (xxx.pem).
     string certAddr; // Adresar s certiikaty.
     int ipKind = 2; // ipv4 = 2, ipv6 = 10.
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
                     exit(1);
                 }
             default:
-                cerr << "Invalid argument\n";
+                cerr << "Invalid argument. -h for help.\n";
                 exit(1);
         }
     }
@@ -607,9 +607,13 @@ void processingMessage(int list){
                         exit(1);
                     }
                     else {
-
+                        // Uprava zdvojenych tecek.
+                        regex e ("\r\n\\.\\.");
+                        message = regex_replace (message,e,"\r\n\\.");
+                        // Ulozeni do sp.
                         os << message;
                         downloadCount++;
+
                     }
                 } else {
                     continue;
@@ -621,6 +625,9 @@ void processingMessage(int list){
                     exit(1);
                 }
                 else {
+                    // Uprava zdvojenych tecek.
+                    regex e ("\r\n\\.");
+                    message = regex_replace (message,e,"\r\n");
 
                     os << message;
                     downloadCount++;
