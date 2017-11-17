@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
             addrFlag = 1;
             address = argv[index];
         } else {
-            cerr << "Invalid argument. Server name is used twice.\n";
+            cerr << "Invalid argument.\n";
             exit(1);
         }
     }
@@ -231,6 +231,14 @@ int main(int argc, char *argv[]) {
         cerr << "Invalid port number. For non-encrypted: 110. For Secure: 995.\n";
         exit(1);
     }
+    if(f.sFlag and f.portNumber == 995){
+        cerr << "Invalid port number. TLS you can use only with port number 110\n";
+        exit(1);
+    }
+    if(f.portNumber == 995 and !f.tFlag){
+        cerr << "Invalid port number\n";
+        exit(1);
+     }
 
 // Osetreni lomitka na konci f.outDir.
     char lastChar = f.outDir.back();
@@ -472,7 +480,6 @@ void communication(){
     string request; // Pozadavek odeslany serveru.
 
     message = receive_message(); // Overeni spojeni.
-    cout << message;
     if(message.substr(0, 4) == "-ERR"){
         cerr << "Username Error.\n";
         exit(1);
@@ -503,7 +510,6 @@ void communication(){
     sendMessage(request);
 
     message = receive_message();
-    cout << message;
     if(message.substr(0, 4) == "-ERR"){
         cerr << "Username Error.\n";
         exit(1);
@@ -516,7 +522,6 @@ void communication(){
     sendMessage(request);
 
     message = receive_message();
-    cout << message;
     if(message.substr(0, 4) == "-ERR"){
         cerr << "Password Error.\n";
         exit(1);
@@ -527,7 +532,6 @@ void communication(){
     sendMessage(request);
 
     message = receive_message();
-    cout << message;
     if(message.substr(0, 4) == "-ERR"){
         cerr << "Error.\n";
         exit(1);
@@ -554,7 +558,6 @@ void communication(){
     sendMessage(request);
 
     message = receive_message();
-    cout << message;
 
     // Ukoncení spojeni.
     close(f.mySocket);
@@ -610,7 +613,7 @@ void processingMessage(int list){
                         // Uprava zdvojenych tecek.
                         regex e ("\r\n\\.\\.");
                         message = regex_replace (message,e,"\r\n\\.");
-                        // Ulozeni do sp.
+                        // Ulozeni do souboru.
                         os << message;
                         downloadCount++;
 
@@ -628,7 +631,7 @@ void processingMessage(int list){
                     // Uprava zdvojenych tecek.
                     regex e ("\r\n\\.");
                     message = regex_replace (message,e,"\r\n");
-
+                    // Ulozeni do souboru.
                     os << message;
                     downloadCount++;
                 }
@@ -832,7 +835,6 @@ string getMessageId(string message, int i){
 
     //mystream.str("");
     uidlMessage = receive_message();
-    cout << uidlMessage;
     if (uidlMessage.substr(0, 3) == "+OK") {
         unsigned long tmpStart = uidlMessage.find_last_of(" ");
         unsigned long tmpEnd = uidlMessage.find("\r\n");
