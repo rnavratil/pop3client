@@ -1,3 +1,5 @@
+# SCHOOL PROJECT
+
 Description:
 Popcl program that allows you to read e-mail via POP3. The program will download after startup
 the messages stored on the server and saves them to the specified directory and displays the number of downloaded messages on the standard output.
